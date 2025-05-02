@@ -1,35 +1,60 @@
-name: "JsMacros Release Gradle CI"
+# This is a basic workflow to help you get started with Actions
 
+name: Build Beta
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
 on:
   release:
     types: [published]
 
-permissions:
-  contents: write
-
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  release:
-    runs-on: "ubuntu-latest"
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - uses: "actions/checkout@v3"
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
 
-      - name: "Set up JDK 21"
-        uses: "actions/setup-java@v3"
+      - uses: actions/github-script@v6
+        id: fname
         with:
-          java-version: 21
-          distribution: "corretto"
-          cache: "gradle"
-
-      - name: Change wrapper permissions
-        run: chmod +x ./gradlew
-      - name: "Compiling VeinBuddy"
-        run: "./gradlew build"
-
-      - name: "Publishing JsMacros"
+          result-encoding: string
+          script: |
+            const fs = require("fs");
+            let file = fs.readFileSync("./gradle.properties");
+            file = file.toString().split("\n").map(e => e.trim().startsWith("mod_version") ? `${e}-beta-${process.env.GITHUB_SHA.substring(0, 7)}` : e).join("\n");
+            fs.writeFileSync("./gradle.properties", file);
+            const mod_version = file.toString().split("\n").filter(e => e.trim().startsWith("mod_version"))[0].split("=")[1].trim();
+            const archives_base_name = file.toString().split("\n").filter(e => e.trim().startsWith("archives_base_name"))[0].split("=")[1].trim();
+            return `${archives_base_name}-${mod_version}`;
+            
+      - name: Zip source code
         run: |
-          for file in $(find "dist/" -maxdepth 1 -type f -name "*.jar"); do
-            echo "Uploading $file"
-            gh release upload ${{ github.event.release.tag_name }} "$file" --clobber
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          mkdir -p dist
+          zip -r "./dist/${{ steps.fname.outputs.result }}-source.zip" .
+          
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'adopt'
+          java-version: '21'
+          cache: 'gradle'
+          
+      - name: Run build with Gradle wrapper
+        run: |
+          chmod +x gradlew
+          ./gradlew build -x test --stacktrace
+      - name: Bundle mods, documentation and source code
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.fname.outputs.result }}
+          path: |
+            ./dist/**/*
+            !./dist/*-sources.jar
+            !./dist/*-dev.jar
+            !./dist/*-dev-shadow.jar
+            !./dist/*-dev-shadow-js.jar
