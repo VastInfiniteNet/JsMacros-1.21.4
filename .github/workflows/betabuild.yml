@@ -49,13 +49,11 @@ jobs:
           chmod +x gradlew
           ./gradlew build -x test --stacktrace
 
-      - name: Bundle mods, documentation and source code
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ steps.fname.outputs.result }}
-          path: |
-            ./dist/**/*
-            !./dist/*-sources.jar
-            !./dist/*-dev.jar
-            !./dist/*-dev-shadow.jar
-            !./dist/*-dev-shadow-js.jar
+      - name: "Publishing jsMacros"
+        run: |
+          for file in $(find "dist/" -maxdepth 1 -type f -name "*.jar"); do
+            echo "Uploading $file"
+            gh release upload ${{ github.event.release.tag_name }} "$file" --clobber
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
