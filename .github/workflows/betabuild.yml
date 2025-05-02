@@ -1,42 +1,31 @@
-# This is a basic workflow to help you get started with Actions
+name: "JsMacros Release Gradle CI"
 
-name: Build Beta
-
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
-on: 
+on:
   release:
     types: [published]
 
 permissions:
   contents: write
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-    # Steps represent a sequence of tasks that will be executed as part of the job
+  release:
+    runs-on: "ubuntu-latest"
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: "actions/checkout@v3"
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: "Set up JDK 21"
+        uses: "actions/setup-java@v3"
         with:
-          distribution: 'adopt'
-          java-version: '21'
-          cache: 'gradle'
+          java-version: 21
+          distribution: "corretto"
+          cache: "gradle"
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-      - name: Run build with Gradle wrapper
-        run: |
-          chmod +x gradlew
-          ./gradlew build
+      - name: Change wrapper permissions
+        run: chmod +x ./gradlew
+      - name: "Compiling VeinBuddy"
+        run: "./gradlew build"
 
-      - name: "Publishing jsMacros"
+      - name: "Publishing JsMacros"
         run: |
           for file in $(find "dist/" -maxdepth 1 -type f -name "*.jar"); do
             echo "Uploading $file"
